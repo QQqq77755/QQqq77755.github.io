@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>金衡智元 - AI评估师</title>
+    <!-- 引入 ECharts 图表库 -->
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+    <style>
+        /* 全局重置 */
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "PingFang SC", "Microsoft YaHei", sans-serif; }
+        body { height: 100vh; display: flex; flex-direction: column; background-color: #f0f2f5; }
+
+        /* 顶部导航栏 */
+        .header {
+            height: 60px; background-color: #0d1b2a; display: flex; align-items: center;
+            padding: 0 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); z-index: 10; color: #ffffff;
+        }
+        .logo-area { display: flex; align-items: center; gap: 12px; }
+        .logo-img {
+            width: 32px; height: 32px; background-color: #fff; border-radius: 50%;
+            display: flex; justify-content: center; align-items: center; color: #c9242b;
+            font-weight: bold; font-size: 12px;
+        }
+        .system-name { font-size: 18px; font-weight: 500; letter-spacing: 1px; }
+
+        /* 主体布局 */
+        .main-container { display: flex; flex: 1; overflow: hidden; }
+
+        /* 左侧侧边栏 */
+        .sidebar {
+            width: 240px; background-color: #1e2a3a; color: #bfcbd9; overflow-y: auto;
+            flex-shrink: 0; padding-top: 10px;
+        }
+        .menu-item {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 12px 24px; cursor: pointer; transition: background 0.3s; font-size: 14px;
+        }
+        .menu-item:hover { background-color: #2b3a4a; color: #fff; }
+        .menu-item.active { background-color: #2b3a4a; color: #fff; border-left: 3px solid #409EFF; }
+
+        .submenu { display: none; background-color: #162333; }
+        .submenu.open { display: block; }
+        .submenu-item {
+            padding: 10px 24px 10px 48px; cursor: pointer; transition: background 0.3s;
+            font-size: 13px; color: #aeb9c9;
+        }
+        .submenu-item:hover { color: #fff; background-color: #1e2a3a; }
+        .submenu-item.active { color: #409EFF; background-color: #1e2a3a; }
+
+        .arrow { transition: transform 0.3s; font-size: 12px; }
+        .arrow.open { transform: rotate(90deg); }
+
+        /* 右侧内容区 - 核心AI面板 */
+        .content { flex: 1; padding: 24px; background-color: #f5f7fa; overflow-y: auto; display: flex; justify-content: center; }
+        .ai-panel {
+            width: 100%; max-width: 1100px; background-color: #ffffff; border-radius: 8px;
+            box-shadow: 0 2px 12px 0 rgba(0,0,0,0.05); display: flex; flex-direction: column; height: 100%;
+        }
+
+        .panel-header {
+            padding: 20px 24px; border-bottom: 1px solid #ebeef5; display: flex; align-items: center;
+            gap: 10px; background-color: #fafbfc; border-radius: 8px 8px 0 0;
+        }
+        .panel-header h2 { font-size: 18px; color: #303133; font-weight: 500; }
+        .ai-badge {
+            background-color: #ecf5ff; color: #409EFF; font-size: 12px; padding: 2px 8px;
+            border-radius: 12px; border: 1px solid #d9ecff;
+        }
+
+        /* 对话流区域 */
+        .chat-area { flex: 1; padding: 24px; overflow-y: auto; display: flex; flex-direction: column; gap: 20px; }
+
+        /* 对话气泡 */
+        .message { display: flex; gap: 12px; max-width: 90%; animation: fadeIn 0.4s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .message.ai { align-self: flex-start; }
+        .message.user { align-self: flex-end; flex-direction: row-reverse; }
+
+        .avatar {
+            width: 36px; height: 36px; border-radius: 50%; display: flex; justify-content: center;
+            align-items: center; font-size: 14px; font-weight: bold; flex-shrink: 0;
+        }
+        .avatar.ai { background-color: #409EFF; color: #fff; }
+        .avatar.user { background-color: #909399; color: #fff; }
+
+        .bubble {
+            padding: 12px 16px; border-radius: 8px; font-size: 14px; line-height: 1.6; color: #303133;
+        }
+        .message.ai .bubble { background-color: #f4f4f5; border-top-left-radius: 0; }
+        .message.user .bubble { background-color: #409EFF; color: #fff; border-top-right-radius: 0; }
+
+        /* 评估结果卡片样式 (AI输出) */
+        .result-card {
+            background-color: #fff; border: 1px solid #ebeef5; border-radius: 6px;
+            padding: 16px; margin-top: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+        }
+        
+        /* 样式：用于渲染图片中的三部分报告 */
+        .report-header { margin-bottom: 20px; }
+        .report-header h3 { font-size: 18px; font-weight: bold; margin-bottom: 15px; }
+        .total-score { font-size: 20px; color: #0056b3; font-weight: bold; margin-bottom: 15px; }
+        .highlight-list { padding-left: 20px; }
+        .highlight-list li { margin-bottom: 8px; line-height: 1.6; }
+
+        .score-table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 14px; }
+        .score-table th, .score-table td { border: 1px solid #e0e0e0; padding: 10px 12px; text-align: left; }
+        .score-table th { background-color: #1e3a5f; color: #fff; font-weight: normal; }
+        .score-table td:first-child, .score-table th:first-child { width: 20%; }
+        .score-table td:nth-child(2), .score-table th:nth-child(2) { width: 10%; text-align: center; }
+        .score-table .total-row { background-color: #1e3a5f; color: #fff; font-weight: bold; text-align: center; }
+
+        .chart-container { width: 100%; height: 400px; margin-top: 20px; border: 1px solid #f0f0f0; padding: 20px; }
+
+        /* 输入框区域 */
+        .input-area {
+            padding: 20px 24px; border-top: 1px solid #ebeef5; display: flex; gap: 12px;
+            background-color: #fafbfc; border-radius: 0 0 8px 8px;
+        }
+        .input-area textarea {
+            flex: 1; padding: 10px 12px; border: 1px solid #dcdfe6; border-radius: 4px;
+            resize: none; height: 44px; line-height: 22px; font-size: 14px; transition: 0.3s;
+        }
+        .input-area textarea:focus { border-color: #409EFF; outline: none; }
+        .btn-send {
+            background-color: #409EFF; color: #fff; border: none; padding: 0 24px;
+            border-radius: 4px; cursor: pointer; font-size: 14px; transition: 0.3s;
+        }
+        .btn-send:hover { background-color: #66b1ff; }
+        
+        /* 滚动条美化 */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-thumb { background: #4a5a6a; border-radius: 3px; }
+        ::-webkit-scrollbar-track { background: #1e2a3a; }
+    </style>
+</head>
+<body>
+
+    <header class="header">
+        <div class="logo-area">
+            <div class="logo-img">金衡</div>
+            <span class="system-name">金衡智元</span>
+        </div>
+    </header>
+
+    <div class="main-container">
+        <aside class="sidebar">
+            <div class="menu-group">
+                <div class="menu-item"><span>数据交互</span><span class="arrow open">▶</span></div>
+                <div class="submenu open">
+                    <div class="submenu-item">知识产权问题</div>
+                    <div class="submenu-item">技术情报检索</div>
+                </div>
+            </div>
+
+            <div class="menu-group">
+                <div class="menu-item"><span>价值评估</span><span class="arrow open">▶</span></div>
+                <div class="submenu open">
+                    <div class="submenu-item">多维估值矩阵</div>
+                    <div class="submenu-item">动态预警看板</div>
+                </div>
+            </div>
+
+            <div class="menu-group">
+                <div class="menu-item active"><span>智能AI评估师</span><span class="arrow open">▶</span></div>
+                <div class="submenu open">
+                    <div class="submenu-item active">智能问答诊断</div>
+                    <div class="submenu-item">自动生成评估报告</div>
+                    <div class="submenu-item">风险数据洞察</div>
+                </div>
+            </div>
+
+            <div class="menu-group">
+                <div class="menu-item"><span>输出应用</span><span class="arrow open">▶</span></div>
+                <div class="submenu open">
+                    <div class="submenu-item">评估报告生成</div>
+                    <div class="submenu-item">智能优化建议</div>
+                </div>
+            </div>
+        </aside>
+
+        <main class="content">
+            <div class="ai-panel">
+                <div class="panel-header">
+                    <h2>智能AI评估师</h2>
+                    <span class="ai-badge">● 在线 大模型驱动</span>
+                </div>
+
+                <!-- 对话区 -->
+                <div class="chat-area" id="chatContainer">
+                    <!-- AI 初始问候 -->
+                    <div class="message ai">
+                        <div class="avatar ai">AI</div>
+                        <div class="bubble">
+                            <b>您好，我是您的知产评估助理，国内领先的AI知产评估智能体！</b>
+                            <br><br>
+                            <div class="result-card">
+                                <h4>💡 可提供全维度知识产权专业评估，覆盖技术、市场、经济、战略四大评估板块及配套法务业务：</h4>
+                                <div style="display: flex; flex-direction: column; gap: 10px; font-size: 14px; color: #303133; margin-top: 8px;">
+                                    <div>🔍 <b>技术评估：</b>开展新颖性检索，对技术价值分层定级，提前排查、预警各类侵权风险</div>
+                                    <div>📈 <b>市场评估：</b>测算商标品牌无形资产价值，规划商标续展方案与多维度品牌防御布局；完成版权确权，分析版权授权、商业化运营变现潜力</div>
+                                    <div>💰 <b>经济评估：</b>出具知识产权价值估值报告，支撑知识产权质押融资作价，为资产交易提供价值依据</div>
+                                    <div>🎯 <b>战略评估：</b>针对企业投资并购、产业布局开展完整知识产权尽职调查，匹配企业长期发展规划</div>
+                                    <div style="border-top: 1px dashed #ebeef5; padding-top: 10px; margin-top: 4px;">⚖️ <b>综合法务：</b>知识产权质押融资、投资并购中的IP尽调</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 输入区 -->
+                <div class="input-area">
+                    <textarea id="userInput" placeholder="输入您需要评估的知产项目、技术名称..." onkeydown="handleEnter(event)"></textarea>
+                    <button class="btn-send" onclick="sendMessage()">发送评估</button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // 触发生成完整报告的函数
+        function sendMessage() {
+            const inputField = document.getElementById('userInput');
+            const userText = inputField.value.trim();
+            const chatContainer = document.getElementById('chatContainer');
+
+            if (userText === '') return;
+
+            appendMessage('user', userText);
+            inputField.value = '';
+
+            setTimeout(() => {
+                let aiResponse = '';
+
+                // 触发器1：专利号识别
+                if (userText === 'CN117431765A') {
+                    aiResponse = `
+                        <b>本发明公开了一款环保型印花浆料，主要应用于纺织绿色印花等环保加工领域。</b><br><br>
+                        该浆料核心优势突出，制备所用原料均为可再生资源，取材广泛且采购成本低廉，具备良好的市场价格优势。相较于市面同类印花产品，其综合竞争力更强，配方调配流程简单便捷，生产操作门槛低。<br><br>
+                        成品可完全生物降解，生产及使用后产生的固废、废液对土壤与水体污染风险极低，契合当下绿色生产、低碳减排的行业发展趋势，经济与生态效益兼备，具备广阔的产业化应用与市场推广前景。
+                    `;
+                } 
+                // 触发器2：评估报告生成
+                else if (userText === '评估报告') {
+                    aiResponse = `
+                        <div class="report-container">
+                            <div class="report-header">
+                                <h3>一、评估结果</h3>
+                                <div class="total-score">综合评分 73 / 总分 100</div>
+                                <ul class="highlight-list" style="list-style-type: none; padding-left: 0;">
+                                    <li style="display: flex; gap: 8px; margin-bottom: 12px;">
+                                        <span style="font-size: 16px;">➢</span> <b>不可规避性较高：</b>对原料种类、配比、固化条件等核心要素进行了详细限定，规避设计需要深入的专业知识和创新突破
+                                    </li>
+                                    <li style="display: flex; gap: 8px; margin-bottom: 12px;">
+                                        <span style="font-size: 16px;">➢</span> <b>技术领域处于朝阳阶段：</b>契合环保趋势下可再生材料需求增长，在纺织印染行业具有明确应用场景和发展潜力
+                                    </li>
+                                    <li style="display: flex; gap: 8px; margin-bottom: 12px;">
+                                        <span style="font-size: 16px;">➢</span> <b>技术不可替代性较强：</b>通过可再生原料与特定配方组合实现生物降解能力，在环保性能方面形成独特技术壁垒
+                                    </li>
+                                </ul>
+                            </div>
+
+                            <div class="report-detail">
+                                <h3>二、详细评分</h3>
+                                <table class="score-table">
+                                    <thead>
+                                        <tr>
+                                            <th>指标</th>
+                                            <th>得分</th>
+                                            <th>评分理由</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr><td>不可规避性</td><td>10</td><td>该专利对于原料的种类、配比、固化条件等都有明确和具体的限定。在化学领域，要完全规避该专利的所有限制并达到相同的技术效果并非易事。综合考虑，该专利被他人进行规避设计有一定难度。</td></tr>
+                                        <tr><td>权利要求合理性</td><td>8</td><td>权利要求中包含了原料的种类、配比、固化条件等多个技术特征，描述较为详细。综上，该专利在权利要求的撰写上基本清楚，但布局的合理性有待提高。</td></tr>
+                                        <tr><td>同族申请</td><td>3</td><td>该专利仅在中国申请，未在国外有同族申请。</td></tr>
+                                        <tr><td>技术依赖度</td><td>8</td><td>专利明确阐述了印花浆料制备所需的原料及配比，实际操作中，在一定程度上依赖于外部的生产设备和原料供应链等因素，但其核心的制备方法和技术流程是明确和独立的。</td></tr>
+                                        <tr><td>技术创新性</td><td>7</td><td>从创新程度来看，该专利在一定程度上改进了现有印花浆料的制备方法和性能。但这种改进并非是开创性的突破，而是在现有技术基础上进行的较为明显的改进。</td></tr>
+                                        <tr><td>技术效果确定性</td><td>8</td><td>从原料选择来看，使用可再生的环氧树脂等原料，符合环保趋势，具有创新性和可行性；对于各组分的配比和固化条件的设定，有较为明确的范围和参数。综合考虑，该技术方案有一定合理性和可行性。</td></tr>
+                                        <tr><td>被引用情况</td><td>0</td><td>该专利的总共被引次数为 0 次，无被引用的专利清单。</td></tr>
+                                        <tr><td>技术领域发展阶段</td><td>10</td><td>该专利的技术方案原料可再生，成本低，可生物降解，废弃物污染风险小，有很好的推广前景。这表明该技术在满足市场对环保和可持续发展的需求方面具有较大潜力，在技术领域处于朝阳阶段。</td></tr>
+                                        <tr><td>技术成熟度</td><td>9</td><td>从专利描述来看，这种基于可再生原料的印花浆料已经明确了具体的制备方法和原料配比，并且提到了其具有成本低廉、配置简便、可生物降解等优点，具有很好的推广前景。</td></tr>
+                                        <tr><td>技术不可替代性</td><td>10</td><td>在当前的技术环境中，虽然存在其他印花浆料的技术，但使用可再生原料并具有这种特定配方和固化条件以实现生物降解能力的技术相对较为独特，其他技术要完全替代本技术的可能性较小。</td></tr>
+                                        <tr style="background-color: #f0f6f9;"><td colspan="3" style="text-align: right; font-weight: bold;">总分 73</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <div class="report-chart">
+                                <h3>三、分值对比图</h3>
+                                <div id="assessmentChart" class="chart-container"></div>
+                            </div>
+                        </div>
+                    `;
+                } 
+                else {
+                    aiResponse = `
+                        感谢您的提问。目前针对 "<b>${userText}</b>" 的详细知产分析报告正在深度检索中。<br><br>
+                        基于初步标签识别，该关键词属于常规产业技术范畴。
+                    `;
+                }
+
+                // 将内容渲染到页面上
+                appendMessage('ai', aiResponse, true);
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+            }, 600);
+        }
+
+        // 动态创建消息气泡
+        function appendMessage(role, content, isChart = false) {
+            const chatContainer = document.getElementById('chatContainer');
+            const msgDiv = document.createElement('div');
+            msgDiv.className = `message ${role}`;
+
+            const avatarDiv = document.createElement('div');
+            avatarDiv.className = `avatar ${role}`;
+            avatarDiv.innerText = role === 'ai' ? 'AI' : '我';
+
+            const bubbleDiv = document.createElement('div');
+            bubbleDiv.className = 'bubble';
+            bubbleDiv.innerHTML = content;
+
+            msgDiv.appendChild(avatarDiv);
+            msgDiv.appendChild(bubbleDiv);
+            chatContainer.appendChild(msgDiv);
+
+            // 如果这条消息包含图表，在DOM渲染完成后初始化ECharts
+            if (isChart && role === 'ai' && content.includes('assessmentChart')) {
+                setTimeout(() => {
+                    initChart();
+                }, 100); 
+            }
+        }
+
+        // 初始化 ECharts 图表
+        function initChart() {
+            const chartDom = document.getElementById('assessmentChart');
+            if (!chartDom) return;
+            
+            const myChart = echarts.init(chartDom);
+            const option = {
+                title: {
+                    text: '专利各评估项目分值情况',
+                    left: 'center',
+                    top: 10,
+                    textStyle: {
+                        fontSize: 20,
+                        fontWeight: 'normal',
+                        color: '#333'
+                    }
+                },
+                tooltip: {
+                    trigger: 'axis',
+                    axisPointer: { type: 'shadow' }
+                },
+                grid: {
+                    left: '3%',
+                    right: '4%',
+                    bottom: '3%',
+                    containLabel: true
+                },
+                xAxis: {
+                    type: 'value',
+                    boundaryGap: [0, 0.01],
+                    max: 10,
+                    axisLabel: { color: '#333' }
+                },
+                yAxis: {
+                    type: 'category',
+                    data: [
+                        '技术不可替代性',
+                        '技术成熟度',
+                        '技术领域发展阶段',
+                        '被引用情况',
+                        '技术效果确定性',
+                        '技术创新性',
+                        '技术依赖度',
+                        '同族申请',
+                        '权利要求合理性',
+                        '不可规避性'
+                    ].reverse(), 
+                    axisLabel: { color: '#333', fontSize: 13 }
+                },
+                series: [
+                    {
+                        name: '得分',
+                        type: 'bar',
+                        data: [10, 9, 10, 0, 8, 7, 8, 3, 8, 10].reverse(),
+                        itemStyle: {
+                            color: '#19577e'
+                        },
+                        barWidth: '50%'
+                    }
+                ]
+            };
+            
+            myChart.setOption(option);
+            
+            window.addEventListener('resize', () => {
+                myChart.resize();
+            });
+        }
+
+        function handleEnter(event) {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                sendMessage();
+            }
+        }
+    </script>
+</body>
+</html>
